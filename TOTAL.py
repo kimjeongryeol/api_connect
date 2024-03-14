@@ -4,19 +4,25 @@
 # In[1]:
 
 
+import csv
+import json
 import requests
 import psycopg2
+import openpyxl
 import pandas as pd
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QLabel, QLineEdit, QPushButton, QSizePolicy,
     QTableWidget, QGridLayout, QHeaderView, QTableWidgetItem, QMessageBox,
-    QInputDialog, QHBoxLayout, QVBoxLayout, QFileDialog, QAbstractItemView
+    QInputDialog, QHBoxLayout, QVBoxLayout, QGridLayout ,QFileDialog, QAbstractItemView
 )
 from PyQt5.QtGui import QPainter, QPolygon, QPen, QBrush, QColor, QFont  # QPoint 제외
 from PyQt5.QtCore import Qt, QPoint  # QPoint를 여기서 임포트
 
 import sys
 import xml.etree.ElementTree as ET
+
+
+
 
 
 # In[2]:
@@ -35,10 +41,12 @@ class ApiCall:
             params[key] = kwargs[key]
         try:
             response =  requests.get(self.url, params=params)
-            return response
+            return DataParser.parse_xml(response.text)
         except requests.exceptions.RequestException as e:
             QMessageBox.critical(None, '에러', f"호출 중 오류 발생: {e}")
             return None
+        
+
         
 
 
@@ -107,46 +115,44 @@ class ParameterSaver:
                 self.F_ConnectionClose(cursor, connection)
 
 
-
 # In[4]:
 
 
 class DataParser:
     @staticmethod
-    def parse_xml(api_data):
+    def parse_xml(api_data): # 데이터 프레임으로 바꿔주는 것
         try:
             root = ET.fromstring(api_data)
-            columns = []
-            data = []
+            # DataFrame을 만들기 위한 빈 리스트 생성
+            data_list = []
 
             # items 요소가 있는지 확인
             items_element = root.find(".//items")
             if items_element:
-                # items 요소가 있는 경우, 기존의 처리 방식으로 진행
-                first_item = root.find(".//item")
-                columns = [child.tag for child in first_item]
-
-                for item in items_element:
-                    row = [item.find(col).text for col in columns]
-                    data.append(row)
+                # items 내부의 item 데이터 추출
+                for item in root.findall('.//item'):
+                    item_data = {}
+                    for child in item:
+                        item_data[child.tag] = child.text
+                    data_list.append(item_data)
             else:
+                pass
                 # items 요소가 없는 경우
-                sub_data = []
-                result_code = root.find(".//resultCode")
-                if result_code is not None:
-                    columns.append("resultCode")
-                    sub_data.append(result_code.text)
+                # sub_data = []
+                # result_code = root.find(".//resultCode")
+                # if result_code is not None:
+                #     columns.append("resultCode")
+                #     sub_data.append(result_code.text)
 
-                result_msg = root.find(".//resultMsg")
-                if result_msg is not None:
-                    columns.append("resultMsg")
-                    sub_data.append(result_msg.text)
-                data.append(sub_data)
-            return columns, data
+                # result_msg = root.find(".//resultMsg")
+                # if result_msg is not None:
+                #     columns.append("resultMsg")
+                #     sub_data.append(result_msg.text)
+                # data.append(sub_data)
+            return pd.DataFrame(data_list)
         except ET.ParseError as e:
             print("XML 파싱 오류:", e)
-            return None, None  # XML 파싱 오류인 경우 None을 반환
-        
+            return None  # XML 파싱 오류인 경우 None을 반환
 
 
 # In[5]:
@@ -154,21 +160,19 @@ class DataParser:
 
 class PreviewUpdater:
     @staticmethod
-    def show_preview(preview_table, columns, data):
+    def show_preview(preview_table, data):
         # 미리보기 테이블 업데이트
-        preview_table.setColumnCount(len(columns))
-        preview_table.setHorizontalHeaderLabels(columns)
-        preview_table.setRowCount(len(data))
+        preview_table.setRowCount(data.shape[0])
+        preview_table.setColumnCount(data.shape[1])
+        preview_table.setHorizontalHeaderLabels(data.columns)
 
-        for row_idx, row_data in enumerate(data):
-            for col_idx, col_data in enumerate(row_data):
-                item = QTableWidgetItem(col_data)
-                item.setTextAlignment(Qt.AlignCenter)  # 데이터를 가운데 정렬
-                preview_table.setItem(row_idx, col_idx, item)
-
+        for row in range(data.shape[0]):
+            for col in range(data.shape[1]):
+                item = QTableWidgetItem(str(data.iloc[row, col]))
+                preview_table.setItem(row, col, item)
 
 
-# In[6]:
+# In[19]:
 
 
 class ParameterViewer(QWidget):
@@ -241,26 +245,27 @@ class ParameterViewer(QWidget):
 
                 if self.parent_widget_type == "MyWidget":
                     self.my_widget_instance.response = requests.get(url)
-                    columns, data = DataParser.parse_xml(self.my_widget_instance.response.text)
-                    PreviewUpdater.show_preview(self.my_widget_instance.preview_table, columns, data)
+                    data = DataParser.parse_xml(self.my_widget_instance.response.text)
+                    PreviewUpdater.show_preview(self.my_widget_instance.preview_table, data)
                 elif self.parent_widget_type == "DataJoinerApp":
                     if self.target_url_field == "api_url1_edit":
                         self.my_widget_instance.api_url1_edit.setText(url)
                     elif self.target_url_field == "api_url2_edit":
                         self.my_widget_instance.api_url2_edit.setText(url)
+                self.close()
             else:
                 print("선택된 행의 URL이 없습니다.")
         else:
             print("선택된 행이 없습니다.")
 
 
-# In[7]:
+# In[37]:
 
 
 class MyWidget(QWidget):
     def __init__(self):
         super().__init__()
-        self.response = None
+        self.response = None # 데이터 프레임???
         self.param_labels = []  # 파라미터 라벨 리스트
         self.param_inputs = []  # 파라미터 입력 필드 리스트
         self.param_grid_row = 0  # 현재 그리드 레이아웃의 행 위치
@@ -365,6 +370,8 @@ class MyWidget(QWidget):
             self.param_inputs.append(param_input)
             self.add_param_to_grid(param_label, param_input)
 
+            param_input.setFocus()
+
     def remove_parameter(self):
         if self.param_labels:
             param_label = self.param_labels.pop()
@@ -394,23 +401,24 @@ class MyWidget(QWidget):
         if not service_key:
             QMessageBox.critical(None, '에러', '서비스 키를 입력하세요.')
             return
-        
+
         # ApiCall 객체 생성
         api_caller = ApiCall(key=service_key, url=url)
-        
+
         # 파라미터 설정
         params = self.get_parameters()
-        
-        # API 호출 및 응답 확인
+
+        # API 호출
         self.response = api_caller.call(serviceKey=service_key, **params)
-        if self.response:
-            # API 응답 처리 및 미리보기 업데이트
-            columns, data = DataParser.parse_xml(self.response.text)
-            PreviewUpdater.show_preview(self.preview_table, columns, data)
+        if not self.response.empty:
+            PreviewUpdater.show_preview(self.preview_table, self.response)
         else:
             print('호출 실패')
+
+    
+
     def download_parameters(self):
-        if self.response:
+        if not self.response.empty:
             id, ok = QInputDialog.getText(self, '저장명 입력', '저장할 ID를 입력하세요:')
             if ok:
                 parameter_saver = ParameterSaver(id, self.response.url)
@@ -425,9 +433,9 @@ class MyWidget(QWidget):
         self.parameter_viewer.show()
 
     def download_data(self):
-        data = self.response.text
-
-        if data:
+        data = self.response
+        print(type(data))
+        if not data.empty:
             file_types = "CSV files (*.csv);;XML files (*.xml);;JSON files (*.json);;Excel files (*.xlsx)"
             file_path, file_type = QFileDialog.getSaveFileName(self, "Save File", "", file_types)
             if file_path:
@@ -444,94 +452,51 @@ class MyWidget(QWidget):
             QMessageBox.critical(None, '에러', 'API 데이터를 가져오지 못했습니다.')
 
 
-# In[8]:
+# In[38]:
 
 
 class DataDownload:
     def __init__(self, api_data):
-        self.api_data = api_data
+        self.api_data = api_data # 데이터 프레임임!!!
 
     def save_xml(self, file_path):
+        data = self.api_data.to_xml(index=False)
         try:
             with open(file_path, 'w', encoding='utf-8') as file:
-                file.write(self.api_data)
+                file.write(data)
             print("XML 파일 저장 성공")
         except Exception as e:
             print("XML 파일 저장 실패:", e)
 
     def save_csv(self, file_path):
         try:
-             # XML 데이터 파싱 및 열 추출
-            root = ET.fromstring(self.api_data)
-            first_item = root.find(".//item")
-            columns = [child.tag for child in first_item]
-
-            # 데이터 추출
-            csv_data = []
-            for item in root.find(".//items"):
-                row = [item.find(col).text for col in columns]
-                csv_data.append(row)
-
-            with open(file_path, 'w', newline='', encoding='utf-8-sig') as file:
-                writer = csv.writer(file)
-                writer.writerow(columns)
-                writer.writerows(csv_data)
-
-            print("CSV 파일 저장 성공")
+            # UTF-8 인코딩으로 CSV 파일 저장, 인덱스는 제외하고, 각 레코드는 '\n'으로 종료
+            self.api_data.to_csv(file_path, index=False, encoding='utf-8-sig')
+            print("csv 파일 저장 성공")
         except Exception as e:
-            print("CSV 파일 저장 실패:", e)
+            print(f"csv 파일 저장 실패: {e}")
+
+
 
     def save_json(self, file_path):
         try:
-            # XML 데이터 파싱 및 열 추출
-            root = ET.fromstring(self.api_data)
-            first_item = root.find(".//item")
-
-            # 데이터 추출
-            json_data = []
-            
-            # XML 요소를 반복하여 JSON 데이터로 변환
-            for item in root.find(".//items"):
-                row = {}
-                for child in item:
-                    row[child.tag] = child.text
-                json_data.append(row)
-
-            with open(file_path, 'w', encoding='utf-8') as json_file:
-                json.dump(json_data, json_file, indent=4)
-
+            with open(file_path, 'w', encoding='utf-8') as file:
+                json.dump(self.api_data.to_dict(orient='records'), file, ensure_ascii=False, indent=4)
             print("JSON 파일 저장 성공")
         except Exception as e:
             print("JSON 파일 저장 실패:", e)
-
+            
     def save_xlsx(self, file_path):
         try:
-            # XML 데이터 파싱 및 열 추출
-            root = ET.fromstring(self.api_data)
-            first_item = root.find(".//item")
-            columns = [child.tag for child in first_item]
-
-            # 데이터 추출
-            xlsx_data = []
-            for item in root.find(".//items"):
-                row = [item.find(col).text for col in columns]
-                xlsx_data.append(row)
-
-            workbook = openpyxl.Workbook()
-            sheet = workbook.active
-            sheet.append(columns)
-            for row_data in xlsx_data:
-                sheet.append(row_data)
-
-            workbook.save(file_path)
-
-            print("Excel 파일 저장 성공")
+        # 엑셀 파일로 저장할 때는 ExcelWriter 객체를 생성하여 사용합니다.
+            with pd.ExcelWriter(file_path, engine='xlsxwriter') as writer:
+                self.api_data.to_excel(writer, index=False)
+            print("엑셀 파일 저장 성공")
         except Exception as e:
-            print("Excel 파일 저장 실패:", e)
+            print("엑셀 파일 저장 실패:", e)
 
 
-
-# In[9]:
+# In[39]:
 
 
 def fetch_data(api_url):
@@ -553,18 +518,18 @@ def parse_xml_to_dict(xml_data):
     return data_list
 
 
-# In[10]:
+# In[40]:
 
 
 class DataJoinerApp(QWidget):
     def __init__(self):
         super().__init__()
         self.initUI()
+        self.joined_data = None
 
     def initUI(self):
         self.setWindowTitle('API Data Joiner')
         self.setGeometry(100, 100, 600, 400)
-        self.setStyleSheet("background-color: #f0f0f0;")
         
         layout = QVBoxLayout()
 
@@ -578,6 +543,12 @@ class DataJoinerApp(QWidget):
         # URL2 선택 버튼에 대한 클릭 이벤트 처리
         self.select_button2.clicked.connect(lambda: self.show_parameters('api_url2_edit'))
 
+
+        # 스타일 설정
+        self.api_url1_edit.setStyleSheet("background-color: white; border: 1px solid #bfbfbf; height: 25px;")
+        self.api_url2_edit.setStyleSheet("background-color: white; border: 1px solid #bfbfbf; height: 25px;")
+        
+        
         # 스타일 설정
         self.api_url1_edit.setStyleSheet("background-color: white; border: 1px solid #bfbfbf; height: 25px;")
         self.api_url2_edit.setStyleSheet("background-color: white; border: 1px solid #bfbfbf; height: 25px;")
@@ -601,6 +572,10 @@ class DataJoinerApp(QWidget):
 
         self.result_table = QTableWidget(self)
         layout.addWidget(self.result_table)
+
+        self.save_btn = QPushButton('파일 저장', self)
+        self.save_btn.clicked.connect(self.download)
+        layout.addWidget(self.save_btn)
 
         self.setLayout(layout)
 
@@ -626,8 +601,8 @@ class DataJoinerApp(QWidget):
             return
 
         if join_column in df1.columns and join_column in df2.columns:
-            joined_data = pd.merge(df1, df2, on=join_column, how='inner')
-            self.show_data_in_table(joined_data)
+            self.joined_data = pd.merge(df1, df2, on=join_column, how='inner')
+            self.show_data_in_table(self.joined_data)
         else:
             QMessageBox.warning(self, '오류', '조인할 컬럼이 누락되었거나 잘못되었습니다.')
             self.result_table.clear()  # 테이블 초기화
@@ -644,8 +619,27 @@ class DataJoinerApp(QWidget):
                 item = QTableWidgetItem(str(data.iloc[row, col]))
                 self.result_table.setItem(row, col, item)
 
+    def download(self):
+        data = self.joined_data
 
-# In[11]:
+        if not data.empty:
+            file_types = "CSV files (*.csv);;XML files (*.xml);;JSON files (*.json);;Excel files (*.xlsx)"
+            file_path, file_type = QFileDialog.getSaveFileName(self, "Save File", "", file_types)
+            if file_path:
+                downloader = DataDownload(data)
+                if file_type == "XML files (*.xml)":
+                    downloader.save_xml(file_path)
+                elif file_type == "JSON files (*.json)":
+                    downloader.save_json(file_path)
+                elif file_type == "CSV files (*.csv)":
+                    downloader.save_csv(file_path)
+                elif file_type == "Excel files (*.xlsx)":
+                    downloader.save_xlsx(file_path)
+        else:
+            QMessageBox.critical(None, '에러', 'API 데이터를 가져오지 못했습니다.')
+
+
+# In[41]:
 
 
 class MainApp(QWidget):
@@ -686,7 +680,7 @@ class MainApp(QWidget):
         self.dataJoiner.show()  # DataJoinerApp 표시
 
 
-# In[13]:
+# In[42]:
 
 
 if __name__ == '__main__':
@@ -696,24 +690,6 @@ if __name__ == '__main__':
     mainApp = MainApp()  # MainApp 인스턴스 생성
     mainApp.show()
     sys.exit(app.exec_())
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
 
 
 # In[ ]:

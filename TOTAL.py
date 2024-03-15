@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[60]:
+# In[85]:
 
 
 import csv
@@ -29,7 +29,7 @@ import xml.etree.ElementTree as ET
 
 
 
-# In[61]:
+# In[86]:
 
 
 class ApiCall:
@@ -51,7 +51,7 @@ class ApiCall:
             return None
 
 
-# In[62]:
+# In[87]:
 
 
 class ParameterSaver:
@@ -116,7 +116,7 @@ class ParameterSaver:
                 self.F_ConnectionClose(cursor, connection)
 
 
-# In[63]:
+# In[88]:
 
 
 class DataParser:
@@ -156,7 +156,7 @@ class DataParser:
             return None  # XML 파싱 오류인 경우 None을 반환
 
 
-# In[64]:
+# In[89]:
 
 
 class PreviewUpdater:
@@ -173,7 +173,7 @@ class PreviewUpdater:
                 preview_table.setItem(row, col, item)
 
 
-# In[65]:
+# In[90]:
 
 
 class ParameterViewer(QWidget):
@@ -285,7 +285,7 @@ class ParameterViewer(QWidget):
             print("선택된 행이 없습니다.")
 
 
-# In[66]:
+# In[91]:
 
 
 class MyWidget(QWidget):
@@ -302,6 +302,7 @@ class MyWidget(QWidget):
 
     def setup(self):
         self.setWindowTitle('API 다운로더')
+        self.setWindowIcon(QIcon(r'C:\Users\Kwate\OneDrive\바탕 화면\qwe1.png'))
         self.setGeometry(600, 600, 600, 600)
         font = QFont()
         font.setPointSize(10)
@@ -505,7 +506,7 @@ class MyWidget(QWidget):
             QMessageBox.critical(None, '에러', 'API 데이터를 가져오지 못했습니다.')
 
 
-# In[67]:
+# In[92]:
 
 
 class DataDownload:
@@ -547,7 +548,7 @@ class DataDownload:
             print("엑셀 파일 저장 실패:", e)
 
 
-# In[68]:
+# In[93]:
 
 
 def fetch_data(api_url):
@@ -575,7 +576,7 @@ def parse_xml_to_dict(xml_data):
     return data_list
 
 
-# In[69]:
+# In[94]:
 
 
 class DataJoinerApp(QWidget):
@@ -586,6 +587,7 @@ class DataJoinerApp(QWidget):
 
     def initUI(self):
         self.setWindowTitle('API Data Joiner')
+        self.setWindowIcon(QIcon(r'C:\Users\Kwate\OneDrive\바탕 화면\qwe1.png'))
         self.setGeometry(100, 100, 600, 400)
         
         layout = QVBoxLayout()
@@ -686,7 +688,7 @@ class DataJoinerApp(QWidget):
             QMessageBox.critical(None, '에러', 'API 데이터를 가져오지 못했습니다.')
 
 
-# In[70]:
+# In[95]:
 
 
 class MainApp(QWidget):
@@ -735,7 +737,7 @@ class MainApp(QWidget):
         self.dataJoiner.show()
 
 
-# In[71]:
+# In[96]:
 
 
 if __name__ == '__main__':

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[13]:
+# In[33]:
 
 
 import csv
@@ -16,7 +16,7 @@ from PyQt5.QtWidgets import (
     QTableWidget, QGridLayout, QHeaderView, QTableWidgetItem, QMessageBox, QComboBox,
     QInputDialog, QHBoxLayout, QVBoxLayout, QGridLayout ,QFileDialog, QAbstractItemView
 )
-from PyQt5.QtGui import QPainter, QPolygon, QPen, QBrush, QColor, QFont  # QPoint 제외
+from PyQt5.QtGui import QPainter, QPolygon, QPen, QBrush, QColor, QFont,QPixmap  # QPoint 제외
 from PyQt5.QtCore import Qt, QPoint  # QPoint를 여기서 임포트
 
 import sys
@@ -29,7 +29,7 @@ import xml.etree.ElementTree as ET
 
 
 
-# In[14]:
+# In[34]:
 
 
 class ApiCall:
@@ -51,7 +51,7 @@ class ApiCall:
             return None
 
 
-# In[15]:
+# In[35]:
 
 
 class ParameterSaver:
@@ -116,7 +116,7 @@ class ParameterSaver:
                 self.F_ConnectionClose(cursor, connection)
 
 
-# In[16]:
+# In[36]:
 
 
 class DataParser:
@@ -156,7 +156,7 @@ class DataParser:
             return None  # XML 파싱 오류인 경우 None을 반환
 
 
-# In[17]:
+# In[37]:
 
 
 class PreviewUpdater:
@@ -173,7 +173,7 @@ class PreviewUpdater:
                 preview_table.setItem(row, col, item)
 
 
-# In[18]:
+# In[38]:
 
 
 class ParameterViewer(QWidget):
@@ -285,7 +285,7 @@ class ParameterViewer(QWidget):
             print("선택된 행이 없습니다.")
 
 
-# In[19]:
+# In[39]:
 
 
 class MyWidget(QWidget):
@@ -505,7 +505,7 @@ class MyWidget(QWidget):
             QMessageBox.critical(None, '에러', 'API 데이터를 가져오지 못했습니다.')
 
 
-# In[20]:
+# In[40]:
 
 
 class DataDownload:
@@ -547,7 +547,7 @@ class DataDownload:
             print("엑셀 파일 저장 실패:", e)
 
 
-# In[21]:
+# In[41]:
 
 
 def fetch_data(api_url):
@@ -575,7 +575,7 @@ def parse_xml_to_dict(xml_data):
     return data_list
 
 
-# In[22]:
+# In[42]:
 
 
 class DataJoinerApp(QWidget):
@@ -686,7 +686,7 @@ class DataJoinerApp(QWidget):
             QMessageBox.critical(None, '에러', 'API 데이터를 가져오지 못했습니다.')
 
 
-# In[23]:
+# In[43]:
 
 
 class MainApp(QWidget):
@@ -699,7 +699,13 @@ class MainApp(QWidget):
     def initUI(self):
         self.setWindowTitle('코딩의 신 정 인 영')
         self.setGeometry(500,500,500,500)
-        
+
+        # 이미지를 QLabel에 삽입
+        image_label = QLabel(self)
+        pixmap = QPixmap(r'C:\Users\Kwate\OneDrive\바탕 화면\qwe.png')  # 이미지 경로를 여기에 넣으세요
+        image_label.setPixmap(pixmap)
+        image_label.setAlignment(Qt.AlignCenter)
+
         # 버튼 두 개가 있는 수평 레이아웃 생성
         hbox = QHBoxLayout()
         btn1 = QPushButton('API 조회', self)
@@ -711,23 +717,24 @@ class MainApp(QWidget):
         hbox.addWidget(btn1)
         hbox.addWidget(btn2)
 
-        # 버튼 레이아웃을 메인 레이아웃에 추가
+        # 버튼 레이아웃과 이미지를 메인 레이아웃에 추가
         vbox = QVBoxLayout()
+        vbox.addWidget(image_label)
         vbox.addLayout(hbox)
         self.setLayout(vbox)
 
     def showMyWidgetApp(self):
         if self.myWidgetApp is None:  # MyWidget 인스턴스가 없으면 생성
-            self.myWidgetApp = MyWidget()  # 이 부분을 MyWidget()으로 수정
-        self.myWidgetApp.show()  # MyWidget 표시
+            self.myWidgetApp = MyWidget()
+        self.myWidgetApp.show()
 
     def showDataJoinerApp(self):
         if self.dataJoiner is None:  # DataJoinerApp 인스턴스가 없으면 생성
             self.dataJoiner = DataJoinerApp()
-        self.dataJoiner.show()  # DataJoinerApp 표시
+        self.dataJoiner.show()
 
 
-# In[26]:
+# In[49]:
 
 
 if __name__ == '__main__':

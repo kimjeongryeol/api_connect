@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[33]:
+# In[60]:
 
 
 import csv
@@ -16,7 +16,7 @@ from PyQt5.QtWidgets import (
     QTableWidget, QGridLayout, QHeaderView, QTableWidgetItem, QMessageBox, QComboBox,
     QInputDialog, QHBoxLayout, QVBoxLayout, QGridLayout ,QFileDialog, QAbstractItemView
 )
-from PyQt5.QtGui import QPainter, QPolygon, QPen, QBrush, QColor, QFont,QPixmap  # QPoint 제외
+from PyQt5.QtGui import QPainter, QPolygon, QPen, QBrush, QColor, QFont, QPixmap, QIcon  # QPoint 제외
 from PyQt5.QtCore import Qt, QPoint  # QPoint를 여기서 임포트
 
 import sys
@@ -29,7 +29,7 @@ import xml.etree.ElementTree as ET
 
 
 
-# In[34]:
+# In[61]:
 
 
 class ApiCall:
@@ -51,7 +51,7 @@ class ApiCall:
             return None
 
 
-# In[35]:
+# In[62]:
 
 
 class ParameterSaver:
@@ -116,7 +116,7 @@ class ParameterSaver:
                 self.F_ConnectionClose(cursor, connection)
 
 
-# In[36]:
+# In[63]:
 
 
 class DataParser:
@@ -156,7 +156,7 @@ class DataParser:
             return None  # XML 파싱 오류인 경우 None을 반환
 
 
-# In[37]:
+# In[64]:
 
 
 class PreviewUpdater:
@@ -173,7 +173,7 @@ class PreviewUpdater:
                 preview_table.setItem(row, col, item)
 
 
-# In[38]:
+# In[65]:
 
 
 class ParameterViewer(QWidget):
@@ -285,7 +285,7 @@ class ParameterViewer(QWidget):
             print("선택된 행이 없습니다.")
 
 
-# In[39]:
+# In[66]:
 
 
 class MyWidget(QWidget):
@@ -505,7 +505,7 @@ class MyWidget(QWidget):
             QMessageBox.critical(None, '에러', 'API 데이터를 가져오지 못했습니다.')
 
 
-# In[40]:
+# In[67]:
 
 
 class DataDownload:
@@ -547,7 +547,7 @@ class DataDownload:
             print("엑셀 파일 저장 실패:", e)
 
 
-# In[41]:
+# In[68]:
 
 
 def fetch_data(api_url):
@@ -575,7 +575,7 @@ def parse_xml_to_dict(xml_data):
     return data_list
 
 
-# In[42]:
+# In[69]:
 
 
 class DataJoinerApp(QWidget):
@@ -686,7 +686,7 @@ class DataJoinerApp(QWidget):
             QMessageBox.critical(None, '에러', 'API 데이터를 가져오지 못했습니다.')
 
 
-# In[43]:
+# In[70]:
 
 
 class MainApp(QWidget):
@@ -702,7 +702,8 @@ class MainApp(QWidget):
 
         # 이미지를 QLabel에 삽입
         image_label = QLabel(self)
-        pixmap = QPixmap(r'C:\Users\Kwate\OneDrive\바탕 화면\qwe.png')  # 이미지 경로를 여기에 넣으세요
+        pixmap = QPixmap(r'C:\Users\Kwate\OneDrive\바탕 화면\qwe1.png')  # 이미지 경로를 여기에 넣으세요
+        self.setWindowIcon(QIcon(r'C:\Users\Kwate\OneDrive\바탕 화면\qwe1.png'))
         image_label.setPixmap(pixmap)
         image_label.setAlignment(Qt.AlignCenter)
 
@@ -734,7 +735,7 @@ class MainApp(QWidget):
         self.dataJoiner.show()
 
 
-# In[49]:
+# In[71]:
 
 
 if __name__ == '__main__':

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[13]:
 
 
 import csv
@@ -10,6 +10,7 @@ import requests
 import psycopg2
 import openpyxl
 import pandas as pd
+from urllib.parse import unquote
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QLabel, QLineEdit, QPushButton, QSizePolicy,
     QTableWidget, QGridLayout, QHeaderView, QTableWidgetItem, QMessageBox, QComboBox,
@@ -28,7 +29,7 @@ import xml.etree.ElementTree as ET
 
 
 
-# In[2]:
+# In[14]:
 
 
 class ApiCall:
@@ -50,7 +51,7 @@ class ApiCall:
             return None
 
 
-# In[3]:
+# In[15]:
 
 
 class ParameterSaver:
@@ -115,7 +116,7 @@ class ParameterSaver:
                 self.F_ConnectionClose(cursor, connection)
 
 
-# In[4]:
+# In[16]:
 
 
 class DataParser:
@@ -155,7 +156,7 @@ class DataParser:
             return None  # XML 파싱 오류인 경우 None을 반환
 
 
-# In[5]:
+# In[17]:
 
 
 class PreviewUpdater:
@@ -172,7 +173,7 @@ class PreviewUpdater:
                 preview_table.setItem(row, col, item)
 
 
-# In[6]:
+# In[18]:
 
 
 class ParameterViewer(QWidget):
@@ -253,6 +254,9 @@ class ParameterViewer(QWidget):
                         connection, cursor = ParameterSaver.F_connectPostDB()
                         cursor.execute("SELECT param FROM PARAMS_TB WHERE id = %s", (id,))
                         rows = cursor.fetchall()
+
+                        self.my_widget_instance.api_input.setText(rows[0][0].split('=')[0])
+                        self.my_widget_instance.key_input.setText(unquote(rows[2][0].split('=')[1]))
                         
                         parameters = {}
                         for row in rows[3:]:
@@ -266,7 +270,7 @@ class ParameterViewer(QWidget):
                         ParameterSaver.F_ConnectionClose(cursor, connection)
 
                     self.my_widget_instance.origin_data = requests.get(url)
-                    self.my_widget_instance.df_data = DataParser.parse_xml(self.my_widget_instance.origin_data.text)
+                    self.my_widget_instance.df_data = fetch_data(self.my_widget_instance.origin_data.url)
                     data = self.my_widget_instance.df_data
                     PreviewUpdater.show_preview(self.my_widget_instance.preview_table, data)
                 elif self.parent_widget_type == "DataJoinerApp":
@@ -281,42 +285,7 @@ class ParameterViewer(QWidget):
             print("선택된 행이 없습니다.")
 
 
-# In[7]:
-
-
-class HistoryManager(QWidget):
-    def __init__(self, label_text, parent=None):
-        super(HistoryManager, self).__init__(parent)
-        self.initUI(label_text)
-        self.comboBox.currentIndexChanged.connect(self.onSelectionChanged)
-    
-    def initUI(self, label_text):
-        self.layout = QVBoxLayout(self)
-        self.label = QLabel(label_text)
-        self.comboBox = QComboBox()
-        self.lineEdit = QLineEdit()
-        self.addButton = QPushButton("Add")
-        self.addButton.clicked.connect(self.addHistory)
-        self.layout.addWidget(self.label)
-        self.layout.addWidget(self.comboBox)
-        self.layout.addWidget(self.lineEdit)
-        self.layout.addWidget(self.addButton)
-    
-    def addHistory(self):
-        text = self.lineEdit.text()
-        if text and text not in self.comboBox.items():
-            self.comboBox.addItem(text)
-            self.lineEdit.clear()
-    
-    def getItems(self):
-        return [self.comboBox.itemText(i) for i in range(self.comboBox.count())]
-    
-    def onSelectionChanged(self, index):
-        text = self.comboBox.itemText(index)
-        self.lineEdit.setText(text)
-
-
-# In[8]:
+# In[19]:
 
 
 class MyWidget(QWidget):
@@ -333,6 +302,7 @@ class MyWidget(QWidget):
 
     def setup(self):
         self.setWindowTitle('API 다운로더')
+        self.setGeometry(600, 600, 600, 600)
         font = QFont()
         font.setPointSize(10)
         self.setFont(font)
@@ -431,6 +401,20 @@ class MyWidget(QWidget):
             param_input.setFocus()
             
     def auto_add_parameters(self, parameters):
+        while self.param_labels:
+            param_label = self.param_labels.pop()
+            param_input = self.param_inputs.pop()
+            param_label.deleteLater()
+            param_input.deleteLater()
+            self.param_grid_layout.removeWidget(param_label)
+            self.param_grid_layout.removeWidget(param_input)
+            param_label.setParent(None)
+            param_input.setParent(None)
+
+        self.param_grid_row = 0
+        self.param_grid_col = 0
+
+        # 새로운 파라미터들 추가
         for key, value in parameters.items():
             param_label = QLabel(key)
             param_label.setMinimumWidth(100)
@@ -481,7 +465,7 @@ class MyWidget(QWidget):
 
         # API 호출
         self.origin_data = api_caller.call(serviceKey=service_key, **params)
-        self.df_data = DataParser.parse_xml(self.origin_data.text)
+        self.df_data = fetch_data(self.origin_data.url)
         if not self.df_data.empty:
             PreviewUpdater.show_preview(self.preview_table, self.df_data)
         else:
@@ -521,7 +505,7 @@ class MyWidget(QWidget):
             QMessageBox.critical(None, '에러', 'API 데이터를 가져오지 못했습니다.')
 
 
-# In[9]:
+# In[20]:
 
 
 class DataDownload:
@@ -563,7 +547,7 @@ class DataDownload:
             print("엑셀 파일 저장 실패:", e)
 
 
-# In[10]:
+# In[21]:
 
 
 def fetch_data(api_url):
@@ -576,16 +560,22 @@ def fetch_data(api_url):
         df = pd.DataFrame(data)
     return df
 
-def parse_xml_to_dict(xml_data):
-    root = ET.fromstring(xml_data)
+def parse_xml_to_dict(xml_data): 
     data_list = []
-    for item in root.findall('.//item'):
-        data = {child.tag: child.text for child in item}
-        data_list.append(data)
+    try:
+        root = ET.fromstring(xml_data)
+        if root.findall('.//item'):
+            for item in root.findall('.//item'):
+                data = {child.tag: child.text for child in item}
+                data_list.append(data)
+        else: # item이 없는 경우에도 처리해야함!!
+            pass
+    except ET.ParseError as e:
+        print("XML 파싱 오류:", e)
     return data_list
 
 
-# In[11]:
+# In[22]:
 
 
 class DataJoinerApp(QWidget):
@@ -696,7 +686,7 @@ class DataJoinerApp(QWidget):
             QMessageBox.critical(None, '에러', 'API 데이터를 가져오지 못했습니다.')
 
 
-# In[12]:
+# In[23]:
 
 
 class MainApp(QWidget):
@@ -737,7 +727,7 @@ class MainApp(QWidget):
         self.dataJoiner.show()  # DataJoinerApp 표시
 
 
-# In[ ]:
+# In[26]:
 
 
 if __name__ == '__main__':

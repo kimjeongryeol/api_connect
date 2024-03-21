@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[27]:
 
 
 import csv
@@ -12,12 +12,12 @@ import openpyxl
 import pandas as pd
 from urllib.parse import unquote
 from PyQt5.QtWidgets import (
-    QApplication, QWidget, QLabel, QLineEdit, QPushButton, QSizePolicy,
+    QApplication, QWidget, QLabel, QLineEdit, QPushButton, QSizePolicy, QDialog,
     QTableWidget, QGridLayout, QHeaderView, QTableWidgetItem, QMessageBox, QComboBox,
     QInputDialog, QHBoxLayout, QVBoxLayout, QGridLayout ,QFileDialog, QAbstractItemView
 )
-from PyQt5.QtGui import QPainter, QPolygon, QPen, QBrush, QColor, QFont, QPixmap, QIcon  # QPoint 제외
-from PyQt5.QtCore import Qt, QPoint  # QPoint를 여기서 임포트
+from PyQt5.QtGui import QPainter, QPolygon, QPen, QBrush, QColor, QFont, QPixmap, QIcon, QMovie  # QPoint 제외
+from PyQt5.QtCore import Qt, QPoint, QTimer, QThread, pyqtSignal  # QPoint를 여기서 임포트
 
 import sys
 import xml.etree.ElementTree as ET
@@ -26,7 +26,7 @@ from urllib.parse import urlparse, parse_qs
 get_ipython().run_line_magic('gui', 'qt')
 
 
-# In[2]:
+# In[28]:
 
 
 class ApiCall:
@@ -48,7 +48,7 @@ class ApiCall:
             return None
 
 
-# In[3]:
+# In[29]:
 
 
 class ParameterSaver:
@@ -137,7 +137,31 @@ class ParameterSaver:
             self.F_ConnectionClose()
 
 
-# In[4]:
+# In[30]:
+
+
+class LoadingDialog(QDialog):
+    def __init__(self, parent=None):
+        super(LoadingDialog, self).__init__(parent)
+        self.setWindowTitle("로딩 중")
+        self.setFixedSize(500, 100)
+        self.setModal(True)  # 다른 윈도우의 입력을 차단
+        self.initUI()
+    
+    def initUI(self):
+        layout = QVBoxLayout()
+        self.label = QLabel("나는 정인영 왕중의 왕이로다 ( •̀ω•́ )σ", self)
+        self.label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.label)
+        self.setLayout(layout)
+
+        # 이 타이머는 예시를 위한 것으로, 실제 로딩 시간은 API 호출 시간에 따라 다릅니다.
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.close) 
+        self.timer.start(10000)
+
+
+# In[31]:
 
 
 class DataParser:
@@ -177,7 +201,7 @@ class DataParser:
             return None  # XML 파싱 오류인 경우 None을 반환
 
 
-# In[5]:
+# In[32]:
 
 
 class EnterLineEdit(QLineEdit):
@@ -192,7 +216,7 @@ class EnterLineEdit(QLineEdit):
             super().keyPressEvent(event)  # 그 외 키는 기본 처리
 
 
-# In[6]:
+# In[33]:
 
 
 class PreviewUpdater:
@@ -209,7 +233,7 @@ class PreviewUpdater:
                 preview_table.setItem(row, col, item)
 
 
-# In[7]:
+# In[34]:
 
 
 class ParameterViewer(QWidget):
@@ -231,10 +255,11 @@ class ParameterViewer(QWidget):
         self.param_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.load_parameter_list()
         layout.addWidget(self.param_table)
+        
         # 확인 버튼 추가
-        confirm_button = QPushButton('확인')
-        confirm_button.clicked.connect(self.on_confirm_button_clicked)
-        layout.addWidget(confirm_button)
+        self.confirm_button = QPushButton('확인')
+        self.confirm_button.clicked.connect(self.on_confirm_button_clicked)
+        layout.addWidget(self.confirm_button)
 
         self.setLayout(layout)
         self.resize(800, 600)  # 창의 크기를 너비 800px, 높이 600px로 설정
@@ -317,12 +342,11 @@ class ParameterViewer(QWidget):
                         print(f"에러 발생: {e}")
                     finally:
                         ParameterSaver.F_ConnectionClose()
-                        self.close_loading_dialog()
 
                 self.close()
 
 
-# In[8]:
+# In[35]:
 
 
 class MyWidget(QWidget):
@@ -499,19 +523,28 @@ class MyWidget(QWidget):
             QMessageBox.critical(None, '에러', '서비스 키를 입력하세요.')
             return
 
+        # 로딩 다이얼로그 생성 및 보여주기
+        self.loadingDialog = LoadingDialog(self)
+        self.loadingDialog.show()
+        QApplication.processEvents()  # 현재 이벤트 큐의 모든 이벤트를 처리하여 UI를 업데이트
+
         # ApiCall 객체 생성
-        api_caller = ApiCall(key=service_key, url=url) 
+        api_caller = ApiCall(key=service_key, url=url)
 
         # 파라미터 설정
         params = self.get_parameters()
 
-        # API 호출
-        self.origin_data = api_caller.call(serviceKey=service_key, **params)
-        self.df_data = fetch_data(self.origin_data.url)
-        if not self.df_data.empty:
-            PreviewUpdater.show_preview(self.preview_table, self.df_data)
-        else:
-            print('호출 실패')
+        # API 호출 (비동기 처리를 고려하지 않은 동기 방식의 예제)
+        try:
+            self.origin_data = api_caller.call(serviceKey=service_key, **params)
+            self.df_data = fetch_data(self.origin_data.url)
+            if not self.df_data.empty:
+                PreviewUpdater.show_preview(self.preview_table, self.df_data)
+            else:
+                print('호출 실패')
+        finally:
+            # 로딩 다이얼로그 닫기
+            self.loadingDialog.close()
 
     def download_parameters(self):
 
@@ -547,7 +580,7 @@ class MyWidget(QWidget):
             QMessageBox.critical(None, '에러', 'API 데이터를 가져오지 못했습니다.')
 
 
-# In[9]:
+# In[36]:
 
 
 class DataDownload:
@@ -589,7 +622,7 @@ class DataDownload:
             print("엑셀 파일 저장 실패:", e)
 
 
-# In[10]:
+# In[37]:
 
 
 def fetch_data(api_url):
@@ -617,7 +650,7 @@ def parse_xml_to_dict(xml_data):
     return data_list
 
 
-# In[11]:
+# In[38]:
 
 
 class DataJoinerApp(QWidget):
@@ -729,7 +762,7 @@ class DataJoinerApp(QWidget):
             QMessageBox.critical(None, '에러', 'API 데이터를 가져오지 못했습니다.')
 
 
-# In[12]:
+# In[39]:
 
 
 class MainApp(QWidget):
@@ -778,13 +811,14 @@ class MainApp(QWidget):
         self.dataJoiner.show()
 
 
-# In[13]:
+# In[40]:
 
 
 app = QApplication.instance() if QApplication.instance() else QApplication(sys.argv)
 if __name__ == '__main__':
     mainApp = MainApp()
     mainApp.show()
+    
 
 
 # In[ ]:
